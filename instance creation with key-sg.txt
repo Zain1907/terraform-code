@@ -1,0 +1,55 @@
+data "aws_security_group" "zain-usg" {
+  id = "sg-0627de0dc2bba2ef8"
+}
+
+resource "aws_eip" "zain-eip" {
+count = 3
+instance = aws_instance.zain-server[count.index].id
+}
+
+#inject my ssh-key
+resource "aws_key_pair" "zk-key" {
+  key_name   = "zk-key"
+  public_key = ""
+}
+
+resource "aws_instance" "zain-server" {
+  ami                     = "ami-00ca32bbc84273381"
+  availability_zone       = "us-east-1a"
+  instance_type           = "t2.micro"
+  key_name                = "zk-key"
+  vpc_security_group_ids = [data.aws_security_group.zain-usg.id]
+  count = 3
+  /* First of generate ssh key and share public ssh key with AWS
+   and you can execute code*/
+
+#root disk
+root_block_device {
+  volume_size           = "10"
+  volume_type           = "gp2"
+  delete_on_termination = true
+}
+
+#additional data disk
+ebs_block_device {
+  device_name           = "/dev/xvdb"
+  volume_size           = "5"
+  volume_type           = "gp2"
+  delete_on_termination = true
+}
+
+user_data = <<-EOF
+        #!/bin/bash
+        sudo yum install httpd -y
+        sudo systemctl start httpd
+        sudo systemctl enable httpd
+        echo "<h1>sample webserver using terraform</h1>" | sudo tee /var/www/html/index.html
+  EOF
+
+tags = {
+  Name     = "hello-India"
+  Stage    = "testing"
+  Location = "India"
+
+}
+}
